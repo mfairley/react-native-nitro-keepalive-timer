@@ -8,7 +8,7 @@ Drop-in `setTimeout` / `setInterval` for React Native that keep firing when the 
   <a href="https://www.npmjs.com/package/react-native-nitro-keepalive-timer"><img alt="npm version" src="https://img.shields.io/npm/v/react-native-nitro-keepalive-timer.svg"></a>
   <a href="https://www.npmjs.com/package/react-native-nitro-keepalive-timer"><img alt="npm downloads" src="https://img.shields.io/npm/dm/react-native-nitro-keepalive-timer.svg"></a>
   <img alt="platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20Android-blue">
-  <img alt="license" src="https://img.shields.io/npm/l/react-native-nitro-keepalive-timer.svg">
+  <img alt="license" src="https://img.shields.io/npm/l/react-native-nitro-keepalive-timer">
 </p>
 
 ---
