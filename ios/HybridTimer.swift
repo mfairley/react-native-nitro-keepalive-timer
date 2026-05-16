@@ -320,10 +320,13 @@ class HybridTimer: HybridTimerSpec {
 
       self.backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "NitroKeepaliveTimer") {
         [weak self] in
-        // System is about to terminate background task
-        // Cancel all timers to clean up gracefully
+        // Background runtime is about to expire. End the background task
+        // (otherwise the OS terminates us) but leave timers scheduled —
+        // they'll be paused while the process is suspended and fire when
+        // the app resumes. The alternative (cancelling here) silently
+        // loses work whenever a bare app crosses the ~30s bg-task budget.
         self?.timerQueue.async {
-          self?.cancelAllTimers()
+          self?.endBackgroundTaskIfNeeded()
         }
       }
     }
