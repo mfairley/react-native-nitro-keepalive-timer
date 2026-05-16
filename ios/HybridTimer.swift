@@ -409,7 +409,9 @@ class HybridTimer: HybridTimerSpec {
     DispatchQueue.main.async { [weak self] in
       guard let self = self else { return }
 
-      self.backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "NitroKeepaliveTimer") {
+      self.backgroundTaskId = UIApplication.shared.beginBackgroundTask(
+        withName: "NitroKeepaliveTimer"
+      ) {
         [weak self] in
         // Background runtime is about to expire. End the background task
         // (otherwise the OS terminates us) but leave timers scheduled —

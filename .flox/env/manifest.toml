@@ -11,6 +11,8 @@ nodejs.pkg-path = "nodejs"
 bun.pkg-path = "bun"
 cocoapods.pkg-path = "cocoapods"
 cocoapods.systems = ["aarch64-darwin", "x86_64-darwin"]
+swift-format.pkg-path = "swift-format"
+ktfmt.pkg-path = "ktfmt"
 # gum.pkg-path = "gum"
 # gum.version = "^0.14.5"
 

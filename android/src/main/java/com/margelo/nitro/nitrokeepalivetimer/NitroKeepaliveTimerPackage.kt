@@ -6,16 +6,18 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.model.ReactModuleInfoProvider
 
 class NitroKeepaliveTimerPackage : BaseReactPackage() {
-    override fun getModule(
-        name: String,
-        reactContext: ReactApplicationContext,
-    ): NativeModule? = null
+  override fun getModule(
+      name: String,
+      reactContext: ReactApplicationContext,
+  ): NativeModule? = null
 
-    override fun getReactModuleInfoProvider(): ReactModuleInfoProvider = ReactModuleInfoProvider { HashMap() }
+  override fun getReactModuleInfoProvider(): ReactModuleInfoProvider = ReactModuleInfoProvider {
+    HashMap()
+  }
 
-    companion object {
-        init {
-            NitroKeepaliveTimerOnLoad.initializeNative()
-        }
+  companion object {
+    init {
+      NitroKeepaliveTimerOnLoad.initializeNative()
     }
+  }
 }
