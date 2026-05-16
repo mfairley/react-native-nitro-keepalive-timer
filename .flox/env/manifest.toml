@@ -20,7 +20,9 @@ cocoapods.systems = ["aarch64-darwin", "x86_64-darwin"]
 ##      as well as [hook], [profile] scripts and [services] below.
 ## -------------------------------------------------------------------
 [vars]
-# INTRO_MESSAGE = "It's gettin' Flox in here"
+# Android / Java — use the JBR bundled with Android Studio.
+JAVA_HOME = "/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+ANDROID_HOME = "$HOME/Library/Android/sdk"
 
 
 ## Activation Hook ---------------------------------------------------

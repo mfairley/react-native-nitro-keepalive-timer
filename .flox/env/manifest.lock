@@ -17,6 +17,10 @@
         "pkg-path": "nodejs"
       }
     },
+    "vars": {
+      "ANDROID_HOME": "$HOME/Library/Android/sdk",
+      "JAVA_HOME": "/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+    },
     "hook": {},
     "profile": {},
     "options": {}
