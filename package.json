@@ -1,6 +1,6 @@
 {
   "name": "react-native-nitro-keepalive-timer",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Background-safe keepalive timers for React Native. Drop-in setTimeout/setInterval that keep firing when the screen is locked — built for LiveKit calls, audio sessions, and long-lived connections. Powered by Nitro Modules.",
   "main": "lib/index",
   "module": "lib/index",
