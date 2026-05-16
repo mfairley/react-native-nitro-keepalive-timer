@@ -22,11 +22,24 @@ private final class TimerEntry {
   let timer: DispatchSourceTimer
   let callback: (Double) -> Void
   let isRepeating: Bool
+  /// Wall-clock fire time, used to detect missed one-shot timers after the
+  /// app resumes from suspension. Only meaningful for `isRepeating == false`.
+  let fireAt: Date
+  /// Set true the first time the callback runs to make resume-time replay
+  /// safe against the DispatchSource also delivering the missed event.
+  /// Accessed only on the timerQueue.
+  var hasFired: Bool = false
 
-  init(timer: DispatchSourceTimer, callback: @escaping (Double) -> Void, isRepeating: Bool) {
+  init(
+    timer: DispatchSourceTimer,
+    callback: @escaping (Double) -> Void,
+    isRepeating: Bool,
+    fireAt: Date
+  ) {
     self.timer = timer
     self.callback = callback
     self.isRepeating = isRepeating
+    self.fireAt = fireAt
   }
 
   deinit {
@@ -93,6 +106,10 @@ class HybridTimer: HybridTimerSpec {
     ) { [weak self] _ in
       self?.timerQueue.async {
         self?.isInBackground = false
+        // Catch one-shot timers whose deadline elapsed while the process
+        // was suspended. The DispatchSource may also deliver the missed
+        // event on resume; `hasFired` guards against double-firing.
+        self?.fireMissedTimers()
       }
     }
 
@@ -187,18 +204,24 @@ class HybridTimer: HybridTimerSpec {
       let leeway = self.calculateLeeway(intervalMs: delayMs, userLeeway: leewayMs)
 
       // Schedule as one-shot with leeway
+      let fireAt = Date().addingTimeInterval(delayMs / 1000.0)
       timer.schedule(
         deadline: .now() + .nanoseconds(Int(delayNanoseconds)),
         leeway: leeway
       )
 
       // Store the entry
-      let entry = TimerEntry(timer: timer, callback: callback, isRepeating: false)
+      let entry = TimerEntry(
+        timer: timer, callback: callback, isRepeating: false, fireAt: fireAt)
       self.timers[id] = entry
 
       // Set up event handler
       timer.setEventHandler { [weak self, weak entry] in
         guard let self = self, let entry = entry else { return }
+        // Guard against the foreground-resume sweep having already fired
+        // this timer.
+        guard !entry.hasFired else { return }
+        entry.hasFired = true
 
         // Remove from active timers
         self.timers.removeValue(forKey: id)
@@ -248,8 +271,10 @@ class HybridTimer: HybridTimerSpec {
         leeway: leeway
       )
 
-      // Store the entry
-      let entry = TimerEntry(timer: timer, callback: callback, isRepeating: true)
+      // Store the entry. `fireAt` is unused for repeating timers — the
+      // DispatchSource handles re-arming and resume-time delivery on its own.
+      let entry = TimerEntry(
+        timer: timer, callback: callback, isRepeating: true, fireAt: Date.distantFuture)
       self.timers[id] = entry
 
       // Set up event handler
@@ -281,6 +306,25 @@ class HybridTimer: HybridTimerSpec {
     guard let entry = timers.removeValue(forKey: id) else { return }
     entry.timer.cancel()
     decrementTimerCount()
+  }
+
+  /// Fires any one-shot timers whose deadline elapsed while the process
+  /// was suspended, then removes them. Called on `willEnterForeground`.
+  /// Must be called on timerQueue.
+  private func fireMissedTimers() {
+    let now = Date()
+    let missed = timers.filter { (_, entry) in
+      !entry.isRepeating && !entry.hasFired && entry.fireAt <= now
+    }
+    for (id, entry) in missed {
+      entry.hasFired = true
+      timers.removeValue(forKey: id)
+      entry.timer.cancel()
+      decrementTimerCount()
+      DispatchQueue.main.async {
+        entry.callback(id)
+      }
+    }
   }
 
   /// Cancels all active timers. Must be called on timerQueue.
