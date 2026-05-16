@@ -106,10 +106,14 @@ class HybridTimer: HybridTimerSpec {
     ) { [weak self] _ in
       self?.timerQueue.async {
         self?.isInBackground = false
-        // Catch one-shot timers whose deadline elapsed while the process
-        // was suspended. The DispatchSource may also deliver the missed
-        // event on resume; `hasFired` guards against double-firing.
-        self?.fireMissedTimers()
+        // Realign one-shot timers against wall-clock. DispatchSourceTimer
+        // uses the monotonic clock, which pauses while the device sleeps,
+        // so a 60s timer started before a 30s lock would otherwise still
+        // wait 60s of awake-time. Past-deadline timers fire immediately;
+        // future-deadline timers get rescheduled for the wall-clock
+        // remainder. `hasFired` guards against double-firing if the
+        // DispatchSource also delivers the missed event on resume.
+        self?.realignOneShotTimersAfterResume()
       }
     }
 
@@ -308,23 +312,66 @@ class HybridTimer: HybridTimerSpec {
     decrementTimerCount()
   }
 
-  /// Fires any one-shot timers whose deadline elapsed while the process
-  /// was suspended, then removes them. Called on `willEnterForeground`.
+  /// Reconciles one-shot timers against wall-clock time after the app
+  /// resumes from a background suspension. For each pending entry:
+  ///   - if its deadline elapsed during suspension, fire and remove it,
+  ///   - if its deadline is still in the future, cancel the old
+  ///     DispatchSource and reschedule a fresh one for the wall-clock
+  ///     remainder (DispatchSource deadlines run on the monotonic clock
+  ///     and would otherwise wait out the full awake-time interval).
   /// Must be called on timerQueue.
-  private func fireMissedTimers() {
+  private func realignOneShotTimersAfterResume() {
     let now = Date()
-    let missed = timers.filter { (_, entry) in
-      !entry.isRepeating && !entry.hasFired && entry.fireAt <= now
-    }
-    for (id, entry) in missed {
-      entry.hasFired = true
-      timers.removeValue(forKey: id)
-      entry.timer.cancel()
-      decrementTimerCount()
-      DispatchQueue.main.async {
-        entry.callback(id)
+    // Snapshot so we can mutate the map while iterating.
+    let snapshot = Array(timers)
+    for (id, entry) in snapshot {
+      guard !entry.isRepeating, !entry.hasFired else { continue }
+      let remainingSeconds = entry.fireAt.timeIntervalSince(now)
+      if remainingSeconds <= 0 {
+        entry.hasFired = true
+        timers.removeValue(forKey: id)
+        entry.timer.cancel()
+        decrementTimerCount()
+        DispatchQueue.main.async {
+          entry.callback(id)
+        }
+      } else {
+        rescheduleOneShot(id: id, entry: entry, remainingSeconds: remainingSeconds)
       }
     }
+  }
+
+  /// Cancels `entry`'s underlying DispatchSource and replaces the map slot
+  /// with a fresh entry scheduled for `remainingSeconds` from now (wall
+  /// clock). Preserves the original `fireAt` so a second resume cycle
+  /// still computes the correct remainder. Must be called on timerQueue.
+  private func rescheduleOneShot(id: Double, entry: TimerEntry, remainingSeconds: Double) {
+    entry.timer.cancel()
+
+    let remainingMs = remainingSeconds * 1000
+    let remainingNanoseconds = UInt64(remainingMs * 1_000_000)
+    let newTimer = DispatchSource.makeTimerSource(queue: timerQueue)
+    newTimer.schedule(
+      deadline: .now() + .nanoseconds(Int(remainingNanoseconds)),
+      leeway: calculateLeeway(intervalMs: remainingMs, userLeeway: AUTO_LEEWAY)
+    )
+
+    let newEntry = TimerEntry(
+      timer: newTimer, callback: entry.callback, isRepeating: false, fireAt: entry.fireAt)
+    timers[id] = newEntry
+
+    newTimer.setEventHandler { [weak self, weak newEntry] in
+      guard let self = self, let newEntry = newEntry else { return }
+      guard !newEntry.hasFired else { return }
+      newEntry.hasFired = true
+
+      self.timers.removeValue(forKey: id)
+      self.decrementTimerCount()
+      DispatchQueue.main.async {
+        newEntry.callback(id)
+      }
+    }
+    newTimer.resume()
   }
 
   /// Cancels all active timers. Must be called on timerQueue.
