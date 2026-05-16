@@ -4,10 +4,12 @@ import { ScrollView, StyleSheet, Text } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 
 import { AppStateCard } from './components/AppStateCard'
+import { BackgroundAudioCard } from './components/BackgroundAudioCard'
 import { ControlsCard } from './components/ControlsCard'
 import { DurationCard, type Duration } from './components/DurationCard'
 import { ResultsCard } from './components/ResultsCard'
 import { useAppState } from './hooks/useAppState'
+import { useBackgroundAudio } from './hooks/useBackgroundAudio'
 import { useTimerRunner } from './hooks/useTimerRunner'
 import { DURATIONS } from './utils/constants'
 
@@ -22,7 +24,9 @@ export default function App() {
 function Screen() {
   const appState = useAppState()
   const [duration, setDuration] = useState<Duration>(DURATIONS[2]) // 1m
+  const [holdAlive, setHoldAlive] = useState(false)
   const runner = useTimerRunner(appState)
+  useBackgroundAudio(holdAlive)
 
   const startNative = useCallback(
     () => runner.start('native', duration.ms),
@@ -47,6 +51,7 @@ function Screen() {
         </Text>
 
         <AppStateCard appState={appState} pendingCount={runner.pendingCount} />
+        <BackgroundAudioCard active={holdAlive} onToggle={setHoldAlive} />
         <DurationCard selected={duration} onSelect={setDuration} />
         <ControlsCard
           onStartNative={startNative}

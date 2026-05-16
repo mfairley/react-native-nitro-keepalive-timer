@@ -33,6 +33,17 @@ const config: ExpoConfig = {
         android: { minSdkVersion: 26 },
       },
     ],
+    [
+      'expo-audio',
+      {
+        microphonePermission: false,
+        recordAudioAndroid: false,
+        // Adds UIBackgroundMode 'audio' on iOS and a media-playback
+        // foreground service on Android. Used here to hold the audio
+        // session active for testing the keepalive timer.
+        enableBackgroundPlayback: true,
+      },
+    ],
   ],
 }
 
